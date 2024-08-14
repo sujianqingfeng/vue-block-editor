@@ -1,4 +1,5 @@
 <script setup>
+import { useThrottleFn } from '@vueuse/core'
 import { GripVertical } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
@@ -56,7 +57,7 @@ function logSelection() {
     return
   }
   const parentNode = selection.anchorNode.parentNode
-  console.log('🚀 ~ logSelection ~ selection:', parentNode)
+  // console.log('🚀 ~ logSelection ~ selection:', parentNode)
   // if (
   //   selection.rangeCount > 0 &&
   //   selection.anchorNode.parentNode === editorRef.value
@@ -80,9 +81,9 @@ function logSelection() {
   list.value[index].focus = true
 }
 
-function getEditorContentRoot(target) {
+function getEditorContentItemRoot(target) {
   while (target) {
-    if (target.dataset.type === 'content') {
+    if (judgeEditorContent(target)) {
       return target
     }
     target = target.parentNode
@@ -90,9 +91,38 @@ function getEditorContentRoot(target) {
 }
 
 function onEnter(e) {
-  console.log('🚀 ~ onEnter ~ e:', e)
-  const selectionEnd = e.target.selectionEnd
-  console.log('🚀 ~ onEnter ~ selectionEnd:', selectionEnd)
+  e.preventDefault()
+
+  const selection = window.getSelection()
+  if (selection.rangeCount === 0) {
+    return
+  }
+
+  const range = selection.getRangeAt(0)
+  const preCaretRange = range.cloneRange()
+  preCaretRange.selectNodeContents(e.target)
+
+  preCaretRange.setEnd(range.endContainer, range.endOffset)
+
+  const cursorPosition = preCaretRange.toString().length
+
+  const itemTarget = getEditorContentItemRoot(range.endContainer.parentNode)
+  console.log('🚀 ~ onEnter ~ itemTarget:', itemTarget)
+
+  if (!itemTarget) {
+    return
+  }
+  const index = getTargetIndexFromDataset(itemTarget)
+  console.log('🚀 ~ onEnter ~ index:', index)
+
+  list.value.splice(index + 1, 0, {
+    id: list.value.length,
+    type: 0,
+    content: 'fffff',
+    hasInfo: true
+  })
+
+  console.log('Cursor Position:', cursorPosition)
 }
 
 const onMouseover = ({ target }) => {
@@ -101,7 +131,7 @@ const onMouseover = ({ target }) => {
   if (len) {
     return
   }
-  const root = getEditorContentRoot(target)
+  const root = getEditorContentItemRoot(target)
   const index = getTargetIndexFromDataset(root)
   const { height, left, top } = target.getBoundingClientRect()
 
@@ -115,10 +145,61 @@ const onMouseover = ({ target }) => {
 
 const onMouseout = ({ target }) => {
   showInfo.value.visible = false
-  const root = getEditorContentRoot(target)
+  const root = getEditorContentItemRoot(target)
   const index = getTargetIndexFromDataset(root)
   // console.log('🚀 ~ onMouseout ~ index:', index)
   list.value[index].focus = false
+}
+
+function onDragStart(e, index) {
+  console.log('🚀 ~ onDragStart ~ e:', e, index)
+
+  const { pageX, pageY } = e
+
+  const element = document.elementFromPoint(pageX, pageY)
+  if (!element.classList.contains('drag-handle')) {
+    e.preventDefault()
+    return
+  }
+
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', index)
+}
+
+const onDragover = useThrottleFn(
+  (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    console.log('🚀 ~ onDragover ~ e:', e)
+  },
+  1000,
+  true,
+  true
+)
+
+// function onDragover(e) {
+//   e.preventDefault()
+//   e.dataTransfer.dropEffect = 'move'
+//   console.log('🚀 ~ onDragover ~ e:', e)
+// }
+
+function onDragleave(e) {
+  console.log('🚀 ~ onDragleave ~ e:', e)
+}
+
+function onDrop(e, targetIndex) {
+  e.preventDefault()
+  // console.log('🚀 ~ onDrag ~ e:', e)
+  const sourceIndex = +e.dataTransfer.getData('text/plain')
+  console.log('🚀 ~ onDrag ~ data:', sourceIndex)
+  console.log('🚀 ~ onDrop ~ targetIndex:', targetIndex)
+
+  const source = list.value[sourceIndex]
+  console.log('🚀 ~ onDrop ~ source:', source)
+  const target = list.value[targetIndex]
+
+  list.value[sourceIndex] = target
+  list.value[targetIndex] = source
 }
 
 const infoVisible = computed(() => {
@@ -144,21 +225,28 @@ onUnmounted(() => {
 
 <template>
   <div class="relative">
-    <div ref="editorRef">
+    <div ref="editorRef" class="outline-none" contenteditable="true">
       <div
         v-for="(item, index) in list"
         :key="item.id"
         :data-id="item.id"
         :data-index="index"
         data-type="content"
-        class="text-xl leading-10 relative"
-        contenteditable="true"
+        class="text-2xl leading-10 relative"
+        draggable="true"
         @mouseover="onMouseover"
         @mouseout="onMouseout"
-        @keydown.enter="onEnter"
+        @dragstart="onDragStart($event, index)"
+        @drop="onDrop($event, index)"
+        @dragover="onDragover($event, index)"
+        @dragleave="onDragleave($event, index)"
       >
-        <div contenteditable="false" class="absolute left-[-40px] top-2">
-          <GripVertical />
+        <div
+          contenteditable="false"
+          class="absolute left-[-40px] top-2"
+          @mouseover.stop=""
+        >
+          <GripVertical class="drag-handle" />
         </div>
         {{ item.content }}
       </div>
