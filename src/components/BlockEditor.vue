@@ -74,8 +74,10 @@ const {
   operation,
   operationStyle,
   operationRef,
-  onDragStart,
   dragRef,
+  dragging,
+  onDragStart,
+  onDragEnd,
   onBlockRootDragover,
   onBlockRootDrop
 } = useDrag({
@@ -127,10 +129,11 @@ const {
       <div
         ref="dragRef"
         draggable="true"
-        class="drag-handle flex items-center"
+        class="drag-handle flex"
         @dragstart="onDragStart"
+        @dragend="onDragEnd"
       >
-        <GripVertical />
+        <GripVertical :style="{ opacity: dragging ? 0 : 1 }" />
       </div>
     </div>
   </div>

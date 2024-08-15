@@ -3,11 +3,12 @@ import { useCommon } from './use-common'
 import { useEditor } from './use-editor'
 
 export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
-  const { getEditorBlockId } = useCommon()
+  const { getEditorBlockId, isEditorBlock } = useCommon()
   const { getBlockElById } = useEditor(editorRef)
 
   const operationRef = ref(null)
   const dragRef = ref(null)
+  const dragging = ref(false)
 
   const operation = ref({
     visible: false
@@ -35,36 +36,62 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
 
   const onBlockMouseout = () => {
     operation.value.visible = false
+    removeDragContent()
+  }
+
+  const removeDragContent = () => {
+    const children = dragRef.value.children
+    if (children.length > 1) {
+      dragRef.value.removeChild(children[1])
+    }
   }
 
   const onDragStart = (e) => {
-    console.log('🚀 ~ onDragStart ~ e:', e)
-
     const block = getBlockElById(operation.value.id)
-    console.log('🚀 ~ onDragStart ~ block:', block)
 
     if (!block) {
       return
     }
 
+    dragging.value = true
     const cloneBlock = block.cloneNode(true)
-    console.log('🚀 ~ onDragStart ~ cloneBlock:', cloneBlock)
 
-    const childrenLen = dragRef.value.children.length
-    if (childrenLen > 1) {
-      dragRef.value.removeChild(dragRef.value.children[1])
-    }
+    block.style.opacity = 0
+
+    removeDragContent()
 
     dragRef.value.appendChild(cloneBlock)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.clearData()
+    e.dataTransfer.setData('text/plain', operation.value.id)
+  }
+
+  const onDragEnd = () => {
+    removeDragContent()
+    dragging.value = false
+    const sourceBlock = getBlockElById(operation.value.id)
+    if (!sourceBlock) {
+      return
+    }
+    sourceBlock.style.opacity = 1
   }
 
   const onBlockRootDrop = (e) => {
     console.log('🚀 ~ onBlockRootDrop ~ e:', e)
+    e.preventDefault()
+    const { target } = e
+
+    if (!isEditorBlock(target)) {
+      return
+    }
+
+    const id = e.dataTransfer.getData('text/plain')
+    const sourceBlock = getBlockElById(id)
+    editorRef.value.insertBefore(sourceBlock, target)
   }
 
   const onBlockRootDragover = (e) => {
-    console.log('🚀 ~ onBlockRootDragover ~ e:', e)
+    // console.log('🚀 ~ onBlockRootDragover ~ e:', e)
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
   }
@@ -77,48 +104,10 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
     operationStyle,
     operationRef,
     dragRef,
+    dragging,
     onDragStart,
+    onDragEnd,
     onBlockRootDragover,
     onBlockRootDrop
   }
-}
-
-function onDragStart(e, index) {
-  console.log('🚀 ~ onDragStart ~ e:', e, index)
-
-  const { pageX, pageY } = e
-
-  const element = document.elementFromPoint(pageX, pageY)
-  if (!element.classList.contains('drag-handle')) {
-    e.preventDefault()
-    return
-  }
-
-  e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData('text/plain', index)
-}
-
-function onDragover(e) {
-  e.preventDefault()
-  e.dataTransfer.dropEffect = 'move'
-  console.log('🚀 ~ onDragover ~ e:', e)
-}
-
-function onDragleave(e) {
-  console.log('🚀 ~ onDragleave ~ e:', e)
-}
-
-function onDrop(e, targetIndex) {
-  e.preventDefault()
-  // console.log('🚀 ~ onDrag ~ e:', e)
-  const sourceIndex = +e.dataTransfer.getData('text/plain')
-  console.log('🚀 ~ onDrag ~ data:', sourceIndex)
-  console.log('🚀 ~ onDrop ~ targetIndex:', targetIndex)
-
-  const source = list.value[sourceIndex]
-  console.log('🚀 ~ onDrop ~ source:', source)
-  const target = list.value[targetIndex]
-
-  list.value[sourceIndex] = target
-  list.value[targetIndex] = source
 }
