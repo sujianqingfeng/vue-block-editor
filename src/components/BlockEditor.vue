@@ -76,10 +76,7 @@ const {
   operationRef,
   dragRef,
   dragging,
-  onDragStart,
-  onDragEnd,
-  onBlockRootDragover,
-  onBlockRootDrop
+  dragContentRef
 } = useDrag({
   editorRef,
   addBlockMouseout,
@@ -91,13 +88,11 @@ const {
   <div class="relative">
     <div
       ref="editorRef"
-      class="editor-root outline-none"
+      class="editor-root"
       contenteditable="true"
       @keydown="onRootKeydown"
       @mouseover="onBlockRootMouseover"
       @mouseout="onBlockRootMouseout"
-      @dragover="onBlockRootDragover"
-      @drop="onBlockRootDrop"
     >
       <div
         v-for="(item, index) in list"
@@ -126,16 +121,12 @@ const {
       class="fixed px-2 flex"
       @mouseover.stop=""
     >
-      <div
-        ref="dragRef"
-        draggable="true"
-        class="drag-handle flex"
-        @dragstart="onDragStart"
-        @dragend="onDragEnd"
-      >
+      <div ref="dragRef" class="drag-handle flex">
         <GripVertical :style="{ opacity: dragging ? 0 : 1 }" />
       </div>
     </div>
+
+    <div ref="dragContentRef" contenteditable="false" class="fixed">ffff</div>
   </div>
 </template>
 

@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCommon } from './use-common'
 import { useEditor } from './use-editor'
 
@@ -6,12 +6,15 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
   const { getEditorBlockId, isEditorBlock } = useCommon()
   const { getBlockElById } = useEditor(editorRef)
 
+  const dragContentRef = ref(null)
   const operationRef = ref(null)
   const dragRef = ref(null)
   const dragging = ref(false)
 
   const operation = ref({
-    visible: false
+    visible: false,
+    top: 0,
+    left: 0
   })
 
   const operationStyle = computed(() => {
@@ -22,8 +25,13 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
   })
 
   const onBlockMouseover = (target) => {
-    const { left, top } = target.getBoundingClientRect()
-    console.log('🚀 ~ onBlockMouseover ~ left:', left)
+    if (dragging.value) {
+      return
+    }
+
+    const rect = target.getBoundingClientRect()
+
+    const { left, top } = rect
     const id = getEditorBlockId(target)
 
     operation.value = {
@@ -91,10 +99,82 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
   }
 
   const onBlockRootDragover = (e) => {
-    // console.log('🚀 ~ onBlockRootDragover ~ e:', e)
+    console.log('🚀 ~ onBlockRootDragover ~ e:', e)
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
   }
+
+  const onDragMousedown = (e) => {
+    console.log('🚀 ~ onDragMousedown ~ e:', e)
+    e.preventDefault()
+
+    const initialX = e.clientX
+    const initialY = e.clientY
+
+    const dragRect = dragRef.value.getBoundingClientRect()
+    const { top, height, left, width } = dragRect
+
+    const dragContentTop = top + height - 10
+    const dragContentLeft = left + width - 10
+
+    const onMoveHandler = (e) => {
+      console.log('🚀 ~ onMoveHandler ~ event:', e)
+      dragging.value = true
+
+      const { clientX, clientY } = e
+      const deltaX = clientX - initialX
+      const deltaY = clientY - initialY
+
+      dragContentRef.value.style.top = `${dragContentTop + deltaY}px`
+      dragContentRef.value.style.left = `${dragContentLeft + deltaX}px`
+
+      const target = document.elementFromPoint(clientX, clientY)
+
+      if (!isEditorBlock(target)) {
+        return
+      }
+
+      // console.log('🚀 ~ onMoveHandler ~ target:======', target)
+    }
+
+    const onUpHandler = (e) => {
+      console.log('🚀 ~ onUpHandler ~ e:', e)
+      dragging.value = false
+
+      const remove = () => {
+        document.removeEventListener('mousemove', onMoveHandler)
+        document.removeEventListener('mouseup', onUpHandler)
+      }
+
+      const { clientX, clientY } = e
+      const target = document.elementFromPoint(clientX, clientY)
+      console.log('🚀 ~ onUpHandler ~ target:', target)
+
+      if (!isEditorBlock(target)) {
+        remove()
+        return
+      }
+
+      console.log('🚀 ~ onUpHandler ~ target:', target)
+
+      const sourceBlock = getBlockElById(operation.value.id)
+      console.log('🚀 ~ onUpHandler ~ sourceBlock:', sourceBlock)
+      editorRef.value.insertBefore(sourceBlock, target)
+
+      remove()
+    }
+
+    document.addEventListener('mousemove', onMoveHandler)
+    document.addEventListener('mouseup', onUpHandler)
+  }
+
+  onMounted(() => {
+    dragRef.value.addEventListener('mousedown', onDragMousedown)
+  })
+
+  onUnmounted(() => {
+    dragRef.value.removeEventListener('mousedown', onDragMousedown)
+  })
 
   addBlockMouseover(onBlockMouseover)
   addBlockMouseout(onBlockMouseout)
@@ -104,10 +184,12 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
     operationStyle,
     operationRef,
     dragRef,
+    dragContentRef,
     dragging,
     onDragStart,
     onDragEnd,
     onBlockRootDragover,
-    onBlockRootDrop
+    onBlockRootDrop,
+    onDragMousedown
   }
 }
