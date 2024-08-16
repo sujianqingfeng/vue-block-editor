@@ -113,12 +113,11 @@ const {
     >
       hover content
     </div>
-
-    <!-- v-if="operation.visible" -->
     <div
+      v-show="operation.visible"
       ref="operationRef"
       :style="operationStyle"
-      class="fixed px-2 flex"
+      class="fixed px-2 flex bg-slate-300"
       @mouseover.stop=""
     >
       <div ref="dragRef" class="drag-handle flex">
@@ -126,12 +125,15 @@ const {
       </div>
     </div>
 
-    <div ref="dragContentRef" contenteditable="false" class="fixed">ffff</div>
+    <div ref="dragContentRef" contenteditable="false" class="fixed"></div>
   </div>
 </template>
 
 <style>
+.editor-root {
+}
+
 .editor-block {
-  @apply leading-4 min-h-[1em] py-[3px] px-[2px];
+  @apply leading-6 min-h-[1em] py-[3px] px-[2px];
 }
 </style>
