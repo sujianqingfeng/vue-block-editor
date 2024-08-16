@@ -31,10 +31,20 @@ export function useCommon() {
     return id
   }
 
+  function getBlockTypeByAction(action) {
+    const types = {
+      0: 'paragraph',
+      1: 'heading1',
+      2: 'heading2'
+    }
+    return types[action]
+  }
+
   return {
     findEditorBlock,
     isEditorBlock,
     isEditorRoot,
-    getEditorBlockId
+    getEditorBlockId,
+    getBlockTypeByAction
   }
 }

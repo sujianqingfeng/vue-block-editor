@@ -1,27 +1,38 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCommon } from './use-common'
+import { useData } from './use-data'
 import { useEditor } from './use-editor'
 
-export function useExtra({ editorRef, addBlockMouseout, addBlockMouseover }) {
+export function useExtra({
+  editorRef,
+  addBlockMouseout,
+  addBlockMouseover,
+  dragging,
+  list
+}) {
   const { isEditorBlock, findEditorBlock, getEditorBlockId } = useCommon()
-
   const { getBlockElById } = useEditor(editorRef)
+
+  const { findRowById } = useData({ list })
+
+  const extraInfoRef = ref()
   const maybeCursorId = ref('')
   const showExtraInfo = ref({
     visible: false,
-    index: 0,
-    top: 0,
-    left: 0
-  })
-
-  const showExtraInfoStyle = computed(() => {
-    return {
-      top: `${showExtraInfo.value.top}px`,
-      left: `${showExtraInfo.value.left}px`
-    }
+    id: ''
   })
 
   const extraInfoVisible = computed(() => {
+    if (dragging.value) {
+      return false
+    }
+
+    const row = findRowById(showExtraInfo.value.id)
+
+    if (!row || !row.info) {
+      return false
+    }
+
     const id = maybeCursorId.value
     let isApproaching = true
     if (id) {
@@ -48,10 +59,11 @@ export function useExtra({ editorRef, addBlockMouseout, addBlockMouseover }) {
 
     showExtraInfo.value = {
       visible: true,
-      left,
-      top: top + height,
       id
     }
+
+    extraInfoRef.value.style.top = `${top + height}px`
+    extraInfoRef.value.style.left = `${left}px`
   }
 
   const onBlockMouseout = () => {
@@ -87,7 +99,7 @@ export function useExtra({ editorRef, addBlockMouseout, addBlockMouseover }) {
   addBlockMouseover(onBlockMouseover)
 
   return {
-    showExtraInfoStyle,
-    extraInfoVisible
+    extraInfoVisible,
+    extraInfoRef
   }
 }

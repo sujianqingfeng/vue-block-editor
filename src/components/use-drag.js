@@ -1,42 +1,35 @@
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { onClickOutside } from '@vueuse/core'
+import { ref } from 'vue'
 import { useCommon } from './use-common'
 import { useEditor } from './use-editor'
-
-function delay(duration) {
-  return new Promise((resolve) => setTimeout(resolve, duration))
-}
 
 function createInsertPlaceholder() {
   const div = document.createElement('div')
   div.style.height = '4px'
   div.style.width = '100%'
+  div.style.position = 'absolute'
   div.style.backgroundColor = '#eee'
   return div
 }
 
 export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
-  const { getEditorBlockId, isEditorBlock } = useCommon()
+  const { getEditorBlockId, isEditorBlock, getBlockTypeByAction } = useCommon()
   const { getBlockElById } = useEditor(editorRef)
 
-  const dragContentRef = ref(null)
-  const operationRef = ref(null)
+  const dragContentRef = ref()
+  const operationRef = ref()
+  const actionRef = ref()
   const dragRef = ref(null)
   const dragging = ref(false)
   const operationShow = ref(false)
-  let timer = null
-
   const operation = ref({
     visible: false,
     top: 0,
     left: 0
   })
 
-  const operationStyle = computed(() => {
-    return {
-      top: `${operation.value.top}px`,
-      left: `${operation.value.left}px`
-    }
-  })
+  const insertPlaceholderDiv = createInsertPlaceholder()
+  let timer = null
 
   const onBlockMouseover = (target) => {
     if (dragging.value) {
@@ -52,21 +45,19 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
     const { left, top } = rect
     const id = getEditorBlockId(target)
 
+    operationRef.value.style.top = `${top}px`
+    operationRef.value.style.left = `${left - 50}px`
+
     operation.value = {
       visible: true,
-      left: left - 30,
-      top: top,
       id
     }
   }
 
   const onBlockMouseout = async () => {
     timer = setTimeout(() => {
-      if (operationShow.value) {
-        return
-      }
       operation.value.visible = false
-    }, 1000)
+    }, 500)
   }
 
   const removeDragContent = () => {
@@ -77,7 +68,6 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
   }
 
   const onDragMousedown = (e) => {
-    console.log('🚀 ~ onDragMousedown ~ e:', e)
     e.preventDefault()
 
     const initialX = e.clientX
@@ -88,8 +78,6 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
 
     const dragContentTop = top + height - 10
     const dragContentLeft = left + width - 10
-
-    const insertPlaceholderDiv = createInsertPlaceholder()
 
     const removeInsertPlaceholder = () => {
       if (insertPlaceholderDiv.parentNode) {
@@ -103,6 +91,8 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
         const cloneBlock = block.cloneNode(true)
         dragContentRef.value.appendChild(cloneBlock)
       }
+      actionRef.value.style.display = 'none'
+      editorRef.value.style['user-select'] = 'none'
 
       dragging.value = true
 
@@ -124,8 +114,8 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
     }
 
     const onUpHandler = (e) => {
-      console.log('🚀 ~ onUpHandler ~ e:', e)
       dragging.value = false
+      editorRef.value.style['user-select'] = 'auto'
 
       const remove = () => {
         removeInsertPlaceholder()
@@ -152,43 +142,63 @@ export function useDrag({ editorRef, addBlockMouseout, addBlockMouseover }) {
     document.addEventListener('mouseup', onUpHandler)
   }
 
+  const onDragMouseup = (e) => {
+    const dragRect = dragRef.value.getBoundingClientRect()
+    const { top, left, height } = dragRect
+
+    actionRef.value.style.top = `${top + height + 8}px`
+    actionRef.value.style.left = `${left - 100}px`
+    actionRef.value.style.display = 'block'
+  }
+
+  const hiddenAction = () => {
+    actionRef.value.style.display = 'none'
+  }
+
+  onClickOutside(actionRef, hiddenAction, {
+    ignore: [dragRef]
+  })
+
+  const onAction = (action) => {
+    const id = operation.value.id
+
+    const block = getBlockElById(id)
+    if (!block) {
+      return
+    }
+
+    block.dataset.type = getBlockTypeByAction(action)
+    hiddenAction()
+  }
+
   const onOperationMouseover = () => {
-    console.log('🚀 ~ onOperationMouseover ~ onOperationMouseover:')
     if (timer) {
       clearTimeout(timer)
     }
-
     operationShow.value = true
   }
 
   const onOperationMouseout = () => {
-    console.log('🚀 ~ onOperationMouseout ~ onOperationMouseout:=====')
-    operationShow.value = false
-    operation.value.visible = false
+    timer = setTimeout(() => {
+      operationShow.value = false
+      operation.value.visible = false
+    }, 500)
   }
-
-  onMounted(() => {
-    dragRef.value.addEventListener('mousedown', onDragMousedown)
-    operationRef.value.addEventListener('mouseover', onOperationMouseover)
-    operationRef.value.addEventListener('mouseout', onOperationMouseout)
-  })
-
-  onUnmounted(() => {
-    dragRef.value.removeEventListener('mousedown', onDragMousedown)
-    operationRef.value.removeEventListener('mouseover', onOperationMouseover)
-    operationRef.value.removeEventListener('mouseout', onOperationMouseout)
-  })
 
   addBlockMouseover(onBlockMouseover)
   addBlockMouseout(onBlockMouseout)
 
   return {
     operation,
-    operationStyle,
     operationRef,
     dragRef,
     dragContentRef,
     dragging,
-    onDragMousedown
+    actionRef,
+    onAction,
+    onDragMouseup,
+    onDragMousedown,
+    onOperationMouseover,
+    onOperationMouseout
   }
 }

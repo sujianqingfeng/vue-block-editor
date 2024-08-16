@@ -4,7 +4,7 @@ import BlockEditor from './components/BlockEditor.vue'
 
 <template>
   <div class="p-4">
-    <h1 class="text-3xl font-bold text-center">Block Editor</h1>
+    <h1 class="text-3xl font-bold text-center py-10">Block Editor</h1>
 
     <div class="flex justify-start">
       <div class="w-[200px]"></div>
